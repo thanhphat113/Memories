@@ -15,3 +15,4 @@ window.ENV = {
 const targetPath = path.join(__dirname, '../js/env.js');
 fs.writeFileSync(targetPath, envConfig);
 console.log('✅ Đã inject thành công biến môi trường vào js/env.js');
+console.log(envConfig);
