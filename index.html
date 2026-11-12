@@ -152,19 +152,27 @@
     </main>
 
     <!-- MODAL LẬT ALBUM 3D -->
-    <div id="modal-flipbook" class="fixed inset-0 z-50 bg-black/85 hidden flex-col justify-center items-center p-2 md:p-6 overflow-hidden">
-        <button onclick="closeFlipbook()" class="absolute top-3 right-4 md:top-4 md:right-6 text-white text-3xl hover:text-pink-400 z-50"><i class="fa-solid fa-xmark"></i></button>
+    <div id="modal-flipbook" class="fixed inset-0 z-50 bg-black/90 hidden flex-col justify-between items-center p-3 md:p-6 overflow-hidden">
         
-        <!-- Header tiêu đề và nút thêm ảnh cân đối -->
-        <div class="album-modal-header">
-            <h3 id="book-modal-title" class="text-white font-sweet text-2xl md:text-5xl text-center px-4">Tiêu đề album</h3>
-            <button onclick="showAddPhotosModal()" class="bg-pink-500 hover:bg-pink-600 text-white px-3.5 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-md transition flex items-center gap-1.5 border border-pink-300/40">
-                <i class="fa-solid fa-image"></i> Thêm ảnh
-            </button>
+        <!-- Đã xóa bg-black/50 để thanh header nhận chuẩn màu gradient của bìa sách từ file CSS -->
+        <div class="album-modal-header w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 shrink-0 relative z-30">
+            
+            <!-- Tiêu đề album -->
+            <h3 id="book-modal-title" class="text-white font-sweet text-xl md:text-3xl text-center sm:text-left truncate w-full sm:flex-1 order-2 sm:order-1">Tiêu đề album</h3>
+
+            <!-- Cụm nút thao tác (Thêm ảnh & Nút X) -->
+            <div class="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-end">
+                <button onclick="showAddPhotosModal()" class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow transition flex items-center gap-1.5 shrink-0">
+                    <i class="fa-solid fa-image"></i> <span>Thêm ảnh</span>
+                </button>
+                <button onclick="closeFlipbook()" class="text-white hover:text-pink-400 text-xl w-8 h-8 flex items-center justify-center bg-white/10 rounded-full transition shrink-0">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
         </div>
 
-        <!-- Khung chứa album chính kết hợp nút lật 2 bên trái/phải -->
-        <div class="relative w-full flex items-center justify-center my-auto">
+        <!-- Khung chứa album chính -->
+        <div class="relative w-full flex items-center justify-center my-auto py-2">
             <button onclick="flipBookPrev()" class="book-side-btn book-side-prev" title="Trang trước"><i class="fa-solid fa-chevron-left"></i></button>
             
             <div id="book-container">
@@ -173,6 +181,8 @@
 
             <button onclick="flipBookNext()" class="book-side-btn book-side-next" title="Trang tiếp"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
+        
+        <div class="h-2 shrink-0"></div>
     </div>
 
     <!-- MODAL ALL PHOTOS -->

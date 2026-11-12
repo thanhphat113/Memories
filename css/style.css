@@ -864,3 +864,29 @@ body { font-family: 'Nunito', sans-serif; background-color: #fff5f7; overflow-x:
     .letter-compose-book { padding: 45px 20px 25px; max-height: 92vh; }
     .letter-compose-input { font-size: 14px; }
 }
+
+/* Đảm bảo các modal quản lý sách, thêm ảnh và popup PIN luôn nằm đè lên trên cùng */
+#modal-add-photos {
+    z-index: 99999 !important;
+}
+
+#modal-create-book {
+    z-index: 99999 !important;
+}
+
+#modal-pin-prompt {
+    z-index: 100000 !important;
+}
+
+#modal-flipbook {
+    z-index: 50000 !important;
+}
+
+.album-modal-header {
+    background: linear-gradient(115deg, #4b201d 0%, #793c32 18%, #572722 48%, #71372e 80%, #3e1918 100%) !important;
+    border: 2px solid #a87852 !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+    border-radius: 12px !important;
+    padding: 10px 16px !important;
+    margin-bottom: 12px !important;
+}
