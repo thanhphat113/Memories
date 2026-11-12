@@ -2,73 +2,138 @@ let pageFlipInstance = null;
 let memoriesData = [];
 let allPhotoItems = [];
 let currentFullImageList = [];
+let currentOpenBookIndex = null;
 
-function fetchMemoriesFromFirebase() {
+// Chia mảng ảnh thành các lô nhỏ (mỗi lô tối đa ~750KB) để không bao giờ vượt giới hạn 1MB của Firestore
+function chunkImagesByByteSize(images, maxBytesPerChunk = 750000) {
+    const chunks = [];
+    let currentChunk = [];
+    let currentSize = 0;
+
+    for (const img of images) {
+        const imgSize = new Blob([img]).size + 10;
+        if (currentChunk.length > 0 && (currentSize + imgSize) > maxBytesPerChunk) {
+            chunks.push(currentChunk);
+            currentChunk = [img];
+            currentSize = imgSize;
+        } else {
+            currentChunk.push(img);
+            currentSize += imgSize;
+        }
+    }
+    if (currentChunk.length > 0) {
+        chunks.push(currentChunk);
+    }
+    return chunks;
+}
+
+async function fetchMemoriesFromFirebase() {
     const grid = document.getElementById('books-grid');
-    if(!db) {
-        grid.innerHTML = '<div class="col-span-full text-center text-yellow-600 py-8">Vui lòng cấu hình <b>CONFIG.firebase</b> để xem sách kỷ niệm.</div>';
+    if (!db) {
+        grid.innerHTML = '<div class="col-span-full text-center text-yellow-600 py-8">Vui lòng cấu hình <b>CONFIG.firebase</b> để xem albums.</div>';
         return;
     }
 
-    db.collection("albums").orderBy("timestamp", "desc").get().then(snapshot => {
-        if(snapshot.empty) {
-            grid.innerHTML = '<p class="col-span-full text-center text-gray-400 py-8">Chưa có cuốn sách kỷ niệm nào. Bấm "Tạo Sách Mới" nhé!</p>';
+    try {
+        const [albumsSnap, photosSnap] = await Promise.all([
+            db.collection("albums").orderBy("timestamp", "desc").get(),
+            db.collection("album_photos").orderBy("timestamp", "asc").get()
+        ]);
+
+        if (albumsSnap.empty) {
+            memoriesData = [];
+            grid.innerHTML = '<p class="col-span-full text-center text-gray-400 py-8">Chưa có album kỷ niệm nào. Bấm "Tạo Album Mới" nhé!</p>';
             return;
         }
-        memoriesData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        
+
+        const photosByAlbumId = {};
+        photosSnap.docs.forEach(doc => {
+            const data = doc.data();
+            if (!data.albumId) return;
+            if (!photosByAlbumId[data.albumId]) {
+                photosByAlbumId[data.albumId] = [];
+            }
+            if (Array.isArray(data.images)) {
+                photosByAlbumId[data.albumId].push(...data.images);
+            }
+        });
+
+        memoriesData = albumsSnap.docs.map(doc => {
+            const data = doc.data();
+            const legacyImages = Array.isArray(data.images) ? data.images : [];
+            const chunkedImages = photosByAlbumId[doc.id] || [];
+            const combinedImages = [...legacyImages, ...chunkedImages];
+
+            return {
+                id: doc.id,
+                title: data.title || 'Kỷ niệm',
+                coverImage: data.coverImage || combinedImages[0] || '',
+                images: combinedImages,
+                timestamp: data.timestamp
+            };
+        });
+
         grid.innerHTML = memoriesData.map((book, idx) => `
             <div onclick="openBook(${idx})"
-                class="glass-card bg-white p-5 rounded-2xl shadow-md cursor-pointer hover:shadow-xl transition transform hover:-translate-y-1 text-center relative">
+                class="glass-card bg-white p-5 rounded-2xl shadow-md cursor-pointer hover:shadow-xl transition transform hover:-translate-y-1 text-center relative group">
 
-                <button class="delete-book-btn" title="Xóa sách" onclick="event.stopPropagation(); deleteBook('${book.id}')">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
+                <div class="book-card-actions">
+                    <button class="book-action-btn add-photo-btn" title="Thêm ảnh vào album" onclick="event.stopPropagation(); showAddPhotosModal(${idx})">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    <button class="book-action-btn delete-book-btn" title="Xóa album" onclick="event.stopPropagation(); deleteBook('${book.id}')">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
 
                 <div class="w-full h-48 bg-pink-50 rounded-xl mb-3 flex items-center justify-center overflow-hidden border border-pink-100">
-                    ${book.images && book.images[0]
-                        ? `<img src="${book.images[0]}" class="w-full h-full object-cover">`
+                    ${book.coverImage
+                        ? `<img src="${book.coverImage}" class="w-full h-full object-cover">`
                         : '<i class="fa-solid fa-book-bookmark text-4xl text-pink-300"></i>'
                     }
                 </div>
 
-                <h4 class="font-sweet text-2xl font-bold text-gray-700">${book.title}</h4>
+                <h4 class="font-sweet text-2xl font-bold text-gray-700">${escapeHtml(book.title)}</h4>
                 <span class="text-xs text-pink-400 font-semibold">${book.images ? book.images.length : 0} khoảnh khắc</span>
             </div>
         `).join('');
-    });
+    } catch (error) {
+        console.error("Fetch memories error:", error);
+        grid.innerHTML = `<div class="col-span-full text-center text-red-500 py-8">Lỗi tải albums: ${escapeHtml(error.message)}</div>`;
+    }
 }
 
 async function deleteBook(bookId) {
-    const pin = prompt("Nhập mã PIN để xóa sách:");
+    const pin = prompt("Nhập mã PIN để xóa album:");
     if (pin === null) return;
     if (pin !== CONFIG.pinCode) {
         alert("Mã PIN không chính xác!");
         return;
     }
 
-    const confirmed = confirm("Bạn có chắc chắn muốn xóa cuốn sách này không?\n\nToàn bộ hình ảnh và dữ liệu của sách sẽ bị xóa vĩnh viễn!");
+    const confirmed = confirm("Bạn có chắc chắn muốn xóa album này không?\n\nToàn bộ hình ảnh và dữ liệu sẽ bị xóa vĩnh viễn!");
     if (!confirmed) return;
 
     try {
+        const childPhotosSnap = await db.collection("album_photos").where("albumId", "==", bookId).get();
+        const deletePromises = childPhotosSnap.docs.map(doc => doc.ref.delete());
+        await Promise.all(deletePromises);
+
         await db.collection("albums").doc(bookId).delete();
         await fetchMemoriesFromFirebase();
-        alert("Đã xóa sách thành công!");
+        alert("Đã xóa album thành công!");
     } catch (error) {
-        console.error("Delete book error:", error);
-        alert("Không thể xóa sách: " + error.message);
+        console.error("Delete album error:", error);
+        alert("Không thể xóa album: " + error.message);
     }
 }
 
 function showCreateBookModal() {
-    const pin = prompt("Nhập mã PIN để tạo sách mới:");
-    if(pin === CONFIG.pinCode) {
+    const pin = prompt("Nhập mã PIN để tạo album mới:");
+    if (pin === CONFIG.pinCode) {
         document.getElementById('modal-create-book').classList.remove('hidden');
         document.getElementById('modal-create-book').classList.add('flex');
-    } else if(pin !== null) {
+    } else if (pin !== null) {
         alert("Mã PIN không chính xác!");
     }
 }
@@ -80,14 +145,14 @@ function closeCreateBookModal() {
 
 async function handleCreateBook(e) {
     e.preventDefault();
-    if(!db) return;
+    if (!db) return;
 
     const title = document.getElementById('book-title-input').value;
     const files = document.getElementById('book-images-input').files;
     const status = document.getElementById('upload-status');
     const btn = document.getElementById('btn-submit-book');
 
-    if(files.length === 0) return;
+    if (files.length === 0) return;
     status.classList.remove('hidden');
     btn.disabled = true;
 
@@ -95,24 +160,124 @@ async function handleCreateBook(e) {
 
     try {
         for (let i = 0; i < files.length; i++) {
-            status.innerText = `Đang nén và xử lý ảnh ${i+1}/${files.length}...`;
+            status.innerText = `Đang nén và xử lý ảnh ${i + 1}/${files.length}...`;
             const compressedBase64 = await compressImage(files[i]);
             imageUrls.push(compressedBase64);
         }
 
-        await db.collection("albums").add({
+        status.innerText = "Đang khởi tạo album...";
+        const albumRef = await db.collection("albums").add({
             title,
-            images: imageUrls,
+            coverImage: imageUrls[0] || '',
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        const chunks = chunkImagesByByteSize(imageUrls);
+        for (let c = 0; c < chunks.length; c++) {
+            status.innerText = `Đang lưu phần ${c + 1}/${chunks.length} lên Firebase...`;
+            await db.collection("album_photos").add({
+                albumId: albumRef.id,
+                images: chunks[c],
+                batchIndex: c,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
 
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         closeCreateBookModal();
         document.getElementById('book-title-input').value = '';
         document.getElementById('book-images-input').value = '';
-        fetchMemoriesFromFirebase();
+        await fetchMemoriesFromFirebase();
     } catch (err) {
         alert("Lỗi: " + err.message);
+    } finally {
+        status.classList.add('hidden');
+        btn.disabled = false;
+    }
+}
+
+function showAddPhotosModal(index = currentOpenBookIndex) {
+    if (index === null || index === undefined || !memoriesData[index]) return;
+
+    const pin = prompt("Nhập mã PIN để thêm ảnh vào album:");
+    if (pin !== CONFIG.pinCode) {
+        if (pin !== null) alert("Mã PIN không chính xác!");
+        return;
+    }
+
+    currentOpenBookIndex = index;
+    const book = memoriesData[index];
+    const currentImages = book.images || [];
+
+    document.getElementById('add-photos-book-name').innerText = `Album: "${book.title}" (Hiện có ${currentImages.length} ảnh)`;
+    document.getElementById('add-photos-capacity-note').innerText = `Hệ thống hỗ trợ thêm số lượng ảnh không giới hạn.`;
+    document.getElementById('add-book-images-input').value = '';
+
+    const modal = document.getElementById('modal-add-photos');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeAddPhotosModal() {
+    const modal = document.getElementById('modal-add-photos');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function handleAddPhotosToBook(e) {
+    e.preventDefault();
+    if (!db || currentOpenBookIndex === null || !memoriesData[currentOpenBookIndex]) return;
+
+    const book = memoriesData[currentOpenBookIndex];
+    const files = document.getElementById('add-book-images-input').files;
+    const status = document.getElementById('add-upload-status');
+    const btn = document.getElementById('btn-submit-add-photos');
+
+    if (files.length === 0) return;
+    status.classList.remove('hidden');
+    btn.disabled = true;
+
+    const newImages = [];
+
+    try {
+        for (let i = 0; i < files.length; i++) {
+            status.innerText = `Đang nén và xử lý ảnh ${i + 1}/${files.length}...`;
+            const compressedBase64 = await compressImage(files[i]);
+            newImages.push(compressedBase64);
+        }
+
+        const chunks = chunkImagesByByteSize(newImages);
+        for (let c = 0; c < chunks.length; c++) {
+            status.innerText = `Đang lưu phần ${c + 1}/${chunks.length} vào album...`;
+            await db.collection("album_photos").add({
+                albumId: book.id,
+                images: chunks[c],
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        if (!book.coverImage && newImages[0]) {
+            await db.collection("albums").doc(book.id).update({
+                coverImage: newImages[0]
+            });
+        }
+
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        closeAddPhotosModal();
+        document.getElementById('add-book-images-input').value = '';
+
+        await fetchMemoriesFromFirebase();
+
+        const flipbookModal = document.getElementById('modal-flipbook');
+        if (flipbookModal && !flipbookModal.classList.contains('hidden')) {
+            const targetIdx = memoriesData.findIndex(b => b.id === book.id);
+            if (targetIdx !== -1) {
+                openBook(targetIdx);
+            }
+        }
+    } catch (err) {
+        console.error("Add photos error:", err);
+        alert("Lỗi khi thêm ảnh: " + err.message);
     } finally {
         status.classList.add('hidden');
         btn.disabled = false;
@@ -124,6 +289,7 @@ function openBook(index) {
     if (!book || !book.images?.length) return;
 
     closeFlipbook();
+    currentOpenBookIndex = index;
     document.getElementById('book-modal-title').innerText = book.title;
 
     const bookContainer = document.getElementById('book-container');
@@ -150,16 +316,21 @@ function openBook(index) {
             try {
                 if (!window.St || !St.PageFlip) throw new Error('Không tải được thư viện PageFlip!');
 
+                // Tăng kích thước album to hơn, cân đối tỷ lệ rộng/cao
+                const isMobile = window.innerWidth < 768;
+                const bookWidth = isMobile ? Math.floor((window.innerWidth - 24) / 2) : 480;
+                const bookHeight = isMobile ? Math.floor(bookWidth * 1.32) : 660;
+
                 pageFlipInstance = new St.PageFlip(container, {
-                    width: 400,
-                    height: 520,
-                    size: "fixed",
-                    minWidth: 300,
+                    width: bookWidth,
+                    height: bookHeight,
+                    size: "stretch",
+                    minWidth: 140,
                     maxWidth: 600,
-                    minHeight: 390,
-                    maxHeight: 700,
+                    minHeight: 200,
+                    maxHeight: 850,
                     maxShadowOpacity: 0.4,
-                    flippingTime: 800,
+                    flippingTime: 700,
                     showCover: false,
                     usePortrait: false,
                     mobileScrollSupport: false,
@@ -168,8 +339,8 @@ function openBook(index) {
 
                 pageFlipInstance.loadFromHTML(container.querySelectorAll('.page'));
             } catch (err) {
-                console.error('Lỗi khởi tạo sách:', err);
-                alert('Không thể mở sách: ' + err.message);
+                console.error('Lỗi khởi tạo album:', err);
+                alert('Không thể mở album: ' + err.message);
             }
         });
     });

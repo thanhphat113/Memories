@@ -151,17 +151,27 @@
         </section>
     </main>
 
-    <!-- MODAL LẬT SÁCH 3D -->
-    <div id="modal-flipbook" class="fixed inset-0 z-50 bg-black/80 hidden flex-col justify-center items-center p-4">
-        <button onclick="closeFlipbook()" class="absolute top-4 right-6 text-white text-3xl hover:text-pink-400"><i class="fa-solid fa-xmark"></i></button>
-        <h3 id="book-modal-title" class="text-white font-sweet text-3xl mb-4">Tiêu đề sách</h3>
-        <div id="book-container">
-            <div id="flipbook"></div>
+    <!-- MODAL LẬT ALBUM 3D -->
+    <div id="modal-flipbook" class="fixed inset-0 z-50 bg-black/85 hidden flex-col justify-center items-center p-2 md:p-6 overflow-hidden">
+        <button onclick="closeFlipbook()" class="absolute top-3 right-4 md:top-4 md:right-6 text-white text-3xl hover:text-pink-400 z-50"><i class="fa-solid fa-xmark"></i></button>
+        
+        <!-- Header tiêu đề và nút thêm ảnh cân đối -->
+        <div class="album-modal-header">
+            <h3 id="book-modal-title" class="text-white font-sweet text-2xl md:text-5xl text-center px-4">Tiêu đề album</h3>
+            <button onclick="showAddPhotosModal()" class="bg-pink-500 hover:bg-pink-600 text-white px-3.5 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-md transition flex items-center gap-1.5 border border-pink-300/40">
+                <i class="fa-solid fa-image"></i> Thêm ảnh
+            </button>
         </div>
 
-        <div class="book-controls">
-            <button onclick="flipBookPrev()"><i class="fa-solid fa-chevron-left mr-2"></i> Trang trước</button>
-            <button onclick="flipBookNext()">Trang tiếp <i class="fa-solid fa-chevron-right ml-2"></i></button>
+        <!-- Khung chứa album chính kết hợp nút lật 2 bên trái/phải -->
+        <div class="relative w-full flex items-center justify-center my-auto">
+            <button onclick="flipBookPrev()" class="book-side-btn book-side-prev" title="Trang trước"><i class="fa-solid fa-chevron-left"></i></button>
+            
+            <div id="book-container">
+                <div id="flipbook"></div>
+            </div>
+
+            <button onclick="flipBookNext()" class="book-side-btn book-side-next" title="Trang tiếp"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
     </div>
 
@@ -196,6 +206,28 @@
                 <div class="flex justify-end space-x-2 pt-2">
                     <button type="button" onclick="closeCreateBookModal()" class="px-4 py-2 text-sm text-gray-500">Hủy</button>
                     <button type="submit" id="btn-submit-book" class="px-5 py-2 bg-pink-500 text-white rounded-lg text-sm font-semibold">Tải Lên</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL THÊM ẢNH VÀO SÁCH HIỆN CÓ -->
+    <div id="modal-add-photos" class="fixed inset-0 z-[60] bg-black/70 hidden justify-center items-center p-4">
+        <div class="glass-card bg-white w-full max-w-md rounded-3xl p-6 relative">
+            <button onclick="closeAddPhotosModal()" class="absolute top-4 right-6 text-gray-400 hover:text-pink-500 text-2xl"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="font-sweet text-3xl text-pink-600 mb-1 text-center">Thêm Ảnh Kỷ Niệm</h3>
+            <p id="add-photos-book-name" class="text-xs text-center text-gray-500 mb-4 font-semibold"></p>
+            
+            <form onsubmit="handleAddPhotosToBook(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Chọn thêm ảnh mới</label>
+                    <input type="file" id="add-book-images-input" multiple accept="image/*" required class="w-full p-2 border rounded-lg text-sm">
+                    <p id="add-photos-capacity-note" class="text-[11px] text-gray-400 mt-1"></p>
+                </div>
+                <div id="add-upload-status" class="text-xs text-center font-semibold text-pink-500 hidden">Đang nén và tải ảnh lên...</div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeAddPhotosModal()" class="px-4 py-2 text-sm text-gray-500">Hủy</button>
+                    <button type="submit" id="btn-submit-add-photos" class="px-5 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded-lg text-sm font-semibold transition">Lưu Ảnh</button>
                 </div>
             </form>
         </div>
