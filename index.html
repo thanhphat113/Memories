@@ -329,5 +329,29 @@
             fetchMemoriesFromFirebase();
         });
     </script>
+
+    <!-- POPUP NHẬP MÃ PIN MINI ĐẸP MẮT (THAY THẾ PROMPT THÔ SƠ) -->
+    <div id="modal-pin-prompt" class="fixed inset-0 z-[99999] bg-black/70 hidden justify-center items-center p-4">
+        <div class="glass-card bg-white w-full max-w-sm rounded-3xl p-6 relative shadow-2xl text-center transform transition-all scale-95 opacity-0 duration-200" id="pin-prompt-box">
+            <button onclick="closePinPrompt(false)" class="absolute top-4 right-5 text-gray-400 hover:text-pink-500 text-xl"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div class="w-12 h-12 bg-pink-100 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-3 text-xl shadow-inner">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            
+            <h3 id="pin-prompt-title" class="font-sweet text-2xl text-pink-600 mb-1">Nhập Mã PIN</h3>
+            <p id="pin-prompt-desc" class="text-xs text-gray-500 mb-4">Vui lòng nhập mã PIN bảo mật để tiếp tục</p>
+            
+            <form onsubmit="submitPinPrompt(event)" class="space-y-3">
+                <input type="password" id="pin-input-field" placeholder="••••" maxlength="10" required 
+                    class="w-full text-center tracking-widest text-lg p-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 transition">
+                
+                <div class="flex gap-2 pt-1">
+                    <button type="button" onclick="closePinPrompt(false)" class="flex-1 py-2.5 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl transition font-semibold">Hủy</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-pink-500 hover:bg-pink-600 text-white rounded-xl text-sm font-semibold shadow-md transition">Xác Nhận</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 </html>

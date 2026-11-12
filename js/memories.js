@@ -104,8 +104,54 @@ async function fetchMemoriesFromFirebase() {
     }
 }
 
+// --- HỆ THỐNG POPUP PIN BẤT ĐỒNG BỘ ---
+let pinResolveCallback = null;
+
+function showPinPrompt(title = "Nhập Mã PIN", desc = "Vui lòng nhập mã bảo mật để tiếp tục") {
+    return new Promise((resolve) => {
+        pinResolveCallback = resolve;
+        document.getElementById('pin-prompt-title').innerText = title;
+        document.getElementById('pin-prompt-desc').innerText = desc;
+        document.getElementById('pin-input-field').value = '';
+        
+        const modal = document.getElementById('modal-pin-prompt');
+        const box = document.getElementById('pin-prompt-box');
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            box.classList.remove('scale-95', 'opacity-0');
+            box.classList.add('scale-100', 'opacity-100');
+            document.getElementById('pin-input-field').focus();
+        }, 10);
+    });
+}
+
+function closePinPrompt(isConfirmed) {
+    const modal = document.getElementById('modal-pin-prompt');
+    const box = document.getElementById('pin-prompt-box');
+    
+    box.classList.remove('scale-100', 'opacity-100');
+    box.classList.add('scale-95', 'opacity-0');
+    
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        if (pinResolveCallback) {
+            const val = isConfirmed ? document.getElementById('pin-input-field').value : null;
+            pinResolveCallback(val);
+            pinResolveCallback = null;
+        }
+    }, 200);
+}
+
+function submitPinPrompt(e) {
+    e.preventDefault();
+    closePinPrompt(true);
+}
+
 async function deleteBook(bookId) {
-    const pin = prompt("Nhập mã PIN để xóa album:");
+    const pin = await showPinPrompt("Xác Nhận Xóa Album", "Nhập mã PIN để xóa vĩnh viễn album này:");
     if (pin === null) return;
     if (pin !== CONFIG.pinCode) {
         alert("Mã PIN không chính xác!");
@@ -129,14 +175,36 @@ async function deleteBook(bookId) {
     }
 }
 
-function showCreateBookModal() {
-    const pin = prompt("Nhập mã PIN để tạo album mới:");
+async function showCreateBookModal() {
+    const pin = await showPinPrompt("Tạo Album Mới", "Nhập mã PIN để tạo album kỷ niệm mới:");
     if (pin === CONFIG.pinCode) {
         document.getElementById('modal-create-book').classList.remove('hidden');
         document.getElementById('modal-create-book').classList.add('flex');
     } else if (pin !== null) {
         alert("Mã PIN không chính xác!");
     }
+}
+
+async function showAddPhotosModal(index = currentOpenBookIndex) {
+    if (index === null || index === undefined || !memoriesData[index]) return;
+
+    const pin = await showPinPrompt("Thêm Ảnh Vào Album", "Nhập mã PIN để tiếp tục thêm khoảnh khắc:");
+    if (pin !== CONFIG.pinCode) {
+        if (pin !== null) alert("Mã PIN không chính xác!");
+        return;
+    }
+
+    currentOpenBookIndex = index;
+    const book = memoriesData[index];
+    const currentImages = book.images || [];
+
+    document.getElementById('add-photos-book-name').innerText = `Album: "${book.title}" (Hiện có ${currentImages.length} ảnh)`;
+    document.getElementById('add-photos-capacity-note').innerText = `Hệ thống hỗ trợ thêm số lượng ảnh không giới hạn.`;
+    document.getElementById('add-book-images-input').value = '';
+
+    const modal = document.getElementById('modal-add-photos');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
 }
 
 function closeCreateBookModal() {
@@ -195,28 +263,6 @@ async function handleCreateBook(e) {
         status.classList.add('hidden');
         btn.disabled = false;
     }
-}
-
-function showAddPhotosModal(index = currentOpenBookIndex) {
-    if (index === null || index === undefined || !memoriesData[index]) return;
-
-    const pin = prompt("Nhập mã PIN để thêm ảnh vào album:");
-    if (pin !== CONFIG.pinCode) {
-        if (pin !== null) alert("Mã PIN không chính xác!");
-        return;
-    }
-
-    currentOpenBookIndex = index;
-    const book = memoriesData[index];
-    const currentImages = book.images || [];
-
-    document.getElementById('add-photos-book-name').innerText = `Album: "${book.title}" (Hiện có ${currentImages.length} ảnh)`;
-    document.getElementById('add-photos-capacity-note').innerText = `Hệ thống hỗ trợ thêm số lượng ảnh không giới hạn.`;
-    document.getElementById('add-book-images-input').value = '';
-
-    const modal = document.getElementById('modal-add-photos');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
 }
 
 function closeAddPhotosModal() {

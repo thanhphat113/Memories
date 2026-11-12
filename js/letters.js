@@ -112,6 +112,14 @@ async function deleteLetter(event, letterId) {
     const data = lettersCache.get(letterId);
     if (!data) return;
 
+    // ĐÃ ĐỔI PROMPT THÀNH POPUP MINI GIỮA MÀN HÌNH
+    const pin = await showPinPrompt("Xác Nhận Xóa Thư", "Nhập mã PIN để xóa lá thư này:");
+    if (pin === null) return;
+    if (pin !== CONFIG.pinCode) {
+        alert("Mã PIN không chính xác!");
+        return;
+    }
+
     const confirmed = confirm(`Bạn có chắc muốn xóa lá thư "${data.title || 'Một lá thư'}" không?\n\nHành động này không thể hoàn tác.`);
     if (!confirmed) return;
 
@@ -130,8 +138,9 @@ async function deleteLetter(event, letterId) {
     }
 }
 
-function showCreateLetterForm() {
-    const pin = prompt("Nhập mã PIN bảo mật để viết thư:");
+async function showCreateLetterForm() {
+    // ĐÃ ĐỔI PROMPT THÀNH POPUP MINI GIỮA MÀN HÌNH
+    const pin = await showPinPrompt("Viết Thư Mới", "Nhập mã PIN bảo mật để viết thư:");
     if (pin !== CONFIG.pinCode) {
         if (pin !== null) alert("Mã PIN không chính xác!");
         return;
