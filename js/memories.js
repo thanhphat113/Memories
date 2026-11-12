@@ -3,6 +3,7 @@ let memoriesData = [];
 let allPhotoItems = [];
 let currentFullImageList = [];
 let currentOpenBookIndex = null;
+let currentMobilePageIndex = 0; // Dành cho chế độ xem 1 ảnh trên mobile
 
 // Chia mảng ảnh thành các lô nhỏ (mỗi lô tối đa ~750KB) để không bao giờ vượt giới hạn 1MB của Firestore
 function chunkImagesByByteSize(images, maxBytesPerChunk = 750000) {
@@ -284,12 +285,14 @@ async function handleAddPhotosToBook(e) {
     }
 }
 
+// MỞ ALBUM: TỰ ĐỘNG PHÂN BIỆT MÁY TÍNH (LẬT SÁCH 2 TRANG) VÀ ĐIỆN THOẠI (HIỂN THỊ 1 TẤM SLIDER)
 function openBook(index) {
     const book = memoriesData[index];
     if (!book || !book.images?.length) return;
 
     closeFlipbook();
     currentOpenBookIndex = index;
+    currentMobilePageIndex = 0;
     document.getElementById('book-modal-title').innerText = book.title;
 
     const bookContainer = document.getElementById('book-container');
@@ -299,62 +302,104 @@ function openBook(index) {
     container.id = 'flipbook';
     bookContainer.appendChild(container);
 
-    let images = [...book.images];
-    if (images.length % 2 !== 0) images.push(null);
-
-    container.innerHTML = images.map(img => {
-        if (!img) return `<div class="page blank-page"></div>`;
-        return `<div class="page"><img src="${img}" alt="Memory"></div>`;
-    }).join('');
+    const isMobile = window.innerWidth < 768;
 
     const modal = document.getElementById('modal-flipbook');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 
-    requestAnimationFrame(() => {
+    if (isMobile) {
+        // GIAO DIỆN ĐIỆN THOẠI: HIỂN THỊ 1 TẤM ẢNH DUY NHẤT VỚI HIỆU ỨNG TRƯỢT/FADE
+        renderMobileSlider(book.images);
+    } else {
+        // GIAO DIỆN MÁY TÍNH: LẬT SÁCH 2 TRANG
+        let images = [...book.images];
+        if (images.length % 2 !== 0) images.push(null);
+
+        container.innerHTML = images.map(img => {
+            if (!img) return `<div class="page blank-page"></div>`;
+            return `<div class="page"><img src="${img}" alt="Memory"></div>`;
+        }).join('');
+
         requestAnimationFrame(() => {
-            try {
-                if (!window.St || !St.PageFlip) throw new Error('Không tải được thư viện PageFlip!');
+            requestAnimationFrame(() => {
+                try {
+                    if (!window.St || !St.PageFlip) throw new Error('Không tải được thư viện PageFlip!');
 
-                // Tăng kích thước album to hơn, cân đối tỷ lệ rộng/cao
-                const isMobile = window.innerWidth < 768;
-                const bookWidth = isMobile ? Math.floor((window.innerWidth - 24) / 2) : 480;
-                const bookHeight = isMobile ? Math.floor(bookWidth * 1.32) : 660;
+                    pageFlipInstance = new St.PageFlip(container, {
+                        width: 480,
+                        height: 660,
+                        size: "stretch",
+                        minWidth: 200,
+                        maxWidth: 600,
+                        minHeight: 300,
+                        maxHeight: 850,
+                        maxShadowOpacity: 0.4,
+                        flippingTime: 700,
+                        showCover: false,
+                        usePortrait: false,
+                        mobileScrollSupport: false,
+                        startPage: 0
+                    });
 
-                pageFlipInstance = new St.PageFlip(container, {
-                    width: bookWidth,
-                    height: bookHeight,
-                    size: "stretch",
-                    minWidth: 140,
-                    maxWidth: 600,
-                    minHeight: 200,
-                    maxHeight: 850,
-                    maxShadowOpacity: 0.4,
-                    flippingTime: 700,
-                    showCover: false,
-                    usePortrait: false,
-                    mobileScrollSupport: false,
-                    startPage: 0
-                });
-
-                pageFlipInstance.loadFromHTML(container.querySelectorAll('.page'));
-            } catch (err) {
-                console.error('Lỗi khởi tạo album:', err);
-                alert('Không thể mở album: ' + err.message);
-            }
+                    pageFlipInstance.loadFromHTML(container.querySelectorAll('.page'));
+                } catch (err) {
+                    console.error('Lỗi khởi tạo album:', err);
+                    alert('Không thể mở album: ' + err.message);
+                }
+            });
         });
-    });
+    }
 }
 
-function flipBookPrev() { if (pageFlipInstance) pageFlipInstance.flipPrev(); }
-function flipBookNext() { if (pageFlipInstance) pageFlipInstance.flipNext(); }
+// Render slider 1 ảnh cho Mobile
+function renderMobileSlider(images) {
+    const container = document.getElementById('flipbook');
+    if (!container) return;
+    
+    container.className = "mobile-single-slider";
+    container.innerHTML = `
+        <div class="mobile-slide-card">
+            <img id="mobile-current-img" src="${images[currentMobilePageIndex]}" alt="Memory">
+            <span class="mobile-slide-counter">${currentMobilePageIndex + 1} / ${images.length}</span>
+        </div>
+    `;
+}
+
+function flipBookPrev() { 
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+        if (!memoriesData[currentOpenBookIndex]) return;
+        const images = memoriesData[currentOpenBookIndex].images;
+        if (currentMobilePageIndex > 0) {
+            currentMobilePageIndex--;
+            renderMobileSlider(images);
+        }
+    } else {
+        if (pageFlipInstance) pageFlipInstance.flipPrev(); 
+    }
+}
+
+function flipBookNext() { 
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+        if (!memoriesData[currentOpenBookIndex]) return;
+        const images = memoriesData[currentOpenBookIndex].images;
+        if (currentMobilePageIndex < images.length - 1) {
+            currentMobilePageIndex++;
+            renderMobileSlider(images);
+        }
+    } else {
+        if (pageFlipInstance) pageFlipInstance.flipNext(); 
+    }
+}
 
 function closeFlipbook() {
     const modal = document.getElementById('modal-flipbook');
     const bookContainer = document.getElementById('book-container');
 
     if (pageFlipInstance) {
-        try { pageFlipInstance.destroy(); } catch (err) { console.warn('PageFlip destroy warning:', err); }
+        try { pageFlipInstance.destroy(); } catch (err) {}
         pageFlipInstance = null;
     }
 
