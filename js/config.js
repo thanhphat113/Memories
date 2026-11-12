@@ -3,7 +3,7 @@ const CONFIG = {
     startDate: "2023-12-25T00:00:00",
     maleName: "Thanh Phát",
     femaleName: "Ngọc Quyên",
-    pinCode: "1234",
+    pinCode: window.ENV?.PASSWORD || "",
     
     firebase: {
         apiKey: window.ENV?.FIREBASE_API_KEY || "YOUR_API_KEY",
