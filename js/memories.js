@@ -3,7 +3,7 @@ let memoriesData = [];
 let allPhotoItems = [];
 let currentFullImageList = [];
 let currentOpenBookIndex = null;
-let currentMobilePageIndex = 0; // Dành cho chế độ xem 1 ảnh trên mobile
+let currentMobilePageIndex = 0;
 
 // Chia mảng ảnh thành các lô nhỏ (mỗi lô tối đa ~750KB) để không bao giờ vượt giới hạn 1MB của Firestore
 function chunkImagesByByteSize(images, maxBytesPerChunk = 750000) {
@@ -285,7 +285,7 @@ async function handleAddPhotosToBook(e) {
     }
 }
 
-// MỞ ALBUM: TỰ ĐỘNG PHÂN BIỆT MÁY TÍNH (LẬT SÁCH 2 TRANG) VÀ ĐIỆN THOẠI (HIỂN THỊ 1 TẤM SLIDER)
+// MỞ ALBUM: TỰ ĐỘNG THÊM/XÓA CLASS SINGLE-MODE TUỲ THEO 1 HAY 2 TRANG
 function openBook(index) {
     const book = memoriesData[index];
     if (!book || !book.images?.length) return;
@@ -302,17 +302,17 @@ function openBook(index) {
     container.id = 'flipbook';
     bookContainer.appendChild(container);
 
-    const isMobile = window.innerWidth < 768;
+    const isSmallScreen = window.innerWidth < 950;
 
     const modal = document.getElementById('modal-flipbook');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 
-    if (isMobile) {
-        // GIAO DIỆN ĐIỆN THOẠI: HIỂN THỊ 1 TẤM ẢNH DUY NHẤT VỚI HIỆU ỨNG TRƯỢT/FADE
+    if (isSmallScreen) {
+        bookContainer.classList.add('single-mode'); // Chế độ 1 trang: Ẩn gáy sách
         renderMobileSlider(book.images);
     } else {
-        // GIAO DIỆN MÁY TÍNH: LẬT SÁCH 2 TRANG
+        bookContainer.classList.remove('single-mode'); // Chế độ 2 trang: Giữ gáy sách
         let images = [...book.images];
         if (images.length % 2 !== 0) images.push(null);
 
@@ -327,12 +327,12 @@ function openBook(index) {
                     if (!window.St || !St.PageFlip) throw new Error('Không tải được thư viện PageFlip!');
 
                     pageFlipInstance = new St.PageFlip(container, {
-                        width: 480,
-                        height: 660,
+                        width: 450,
+                        height: 620,
                         size: "stretch",
-                        minWidth: 200,
+                        minWidth: 250,
                         maxWidth: 600,
-                        minHeight: 300,
+                        minHeight: 350,
                         maxHeight: 850,
                         maxShadowOpacity: 0.4,
                         flippingTime: 700,
@@ -352,7 +352,7 @@ function openBook(index) {
     }
 }
 
-// Render slider 1 ảnh cho Mobile
+// Render slider từng tấm ảnh đơn
 function renderMobileSlider(images) {
     const container = document.getElementById('flipbook');
     if (!container) return;
@@ -367,8 +367,8 @@ function renderMobileSlider(images) {
 }
 
 function flipBookPrev() { 
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) {
+    const isSmallScreen = window.innerWidth < 950;
+    if (isSmallScreen) {
         if (!memoriesData[currentOpenBookIndex]) return;
         const images = memoriesData[currentOpenBookIndex].images;
         if (currentMobilePageIndex > 0) {
@@ -381,8 +381,8 @@ function flipBookPrev() {
 }
 
 function flipBookNext() { 
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) {
+    const isSmallScreen = window.innerWidth < 950;
+    if (isSmallScreen) {
         if (!memoriesData[currentOpenBookIndex]) return;
         const images = memoriesData[currentOpenBookIndex].images;
         if (currentMobilePageIndex < images.length - 1) {
@@ -403,46 +403,33 @@ function closeFlipbook() {
         pageFlipInstance = null;
     }
 
-    if (bookContainer) bookContainer.innerHTML = '';
+    if (bookContainer) {
+        bookContainer.innerHTML = '';
+        bookContainer.classList.remove('single-mode');
+    }
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
 }
 
-function openAllPhotos() {
-    const grid = document.getElementById('all-photos-grid');
-    allPhotoItems = memoriesData.flatMap(book =>
-        (book.images || []).map(img => ({ url: img, title: book.title }))
-    );
-
-    currentFullImageList = allPhotoItems.map(item => item.url);
-    document.getElementById('all-photos-count').innerText = `${allPhotoItems.length} khoảnh khắc`;
-
-    if (allPhotoItems.length === 0) {
-        grid.innerHTML = `
-            <div class="col-span-full text-center text-gray-400 py-20">
-                <i class="fa-solid fa-images text-5xl mb-4"></i>
-                <p>Chưa có ảnh kỷ niệm nào.</p>
-            </div>`;
-    } else {
-        grid.innerHTML = allPhotoItems.map((item, index) => `
-            <div class="photo-item" onclick="openFullImage(${index})">
-                <img src="${item.url}" loading="lazy" alt="Memory">
-                <div class="photo-overlay">
-                    <p class="font-semibold truncate">${escapeHtml(item.title)}</p>
-                    <p class="opacity-70">Ảnh ${index + 1}</p>
-                </div>
-            </div>`).join('');
+let lastWidth = window.innerWidth;
+window.addEventListener('resize', () => {
+    const currentWidth = window.innerWidth;
+    // Chỉ kích hoạt khi thực sự vượt mốc 950px (chuyển đổi trạng thái 1 trang <-> 2 trang)
+    if ((lastWidth >= 950 && currentWidth < 950) || (lastWidth < 950 && currentWidth >= 950)) {
+        lastWidth = currentWidth;
+        const modal = document.getElementById('modal-flipbook');
+        if (modal && !modal.classList.contains('hidden') && currentOpenBookIndex !== null) {
+            // Xóa sạch instance cũ để vẽ lại chế độ mới ngay lập tức
+            if (pageFlipInstance) {
+                try { pageFlipInstance.destroy(); } catch (err) {}
+                pageFlipInstance = null;
+            }
+            const bookContainer = document.getElementById('book-container');
+            if (bookContainer) bookContainer.innerHTML = '';
+            
+            openBook(currentOpenBookIndex);
+        }
     }
-
-    const modal = document.getElementById('modal-all-photos');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
-function closeAllPhotos() {
-    const modal = document.getElementById('modal-all-photos');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
+});
